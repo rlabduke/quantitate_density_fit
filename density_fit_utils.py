@@ -224,7 +224,7 @@ class ProbeDots(object) :
 
   def run_probe_and_deposit_xyzs(self) :
     probesele = 'CHAIN_%s %i' % (self.chain,self.resseq)
-    args = ['phenix.probe','-q','-drop','-rad0.0','-add%.2f' % self.radius_add]
+    args = ['phenix.probe','-q','-rad0.0','-add%.2f' % self.radius_add]
     #args = ['phenix.probe','-q','-drop','-rad0.0']
     args+= ['-out', probesele, self.file_name]
     pop = subprocess.Popen(args,stdout=subprocess.PIPE)
@@ -269,12 +269,13 @@ class ProbeDots(object) :
 
   def write_kin_dots_and_density_values(self,log=sys.stdout) :
     col = 'gray'
-    print >> log, '''@group dominant {%s,%s,%s}
+    print >> log, '''@group dominant {%s,%s,%s,%.2f}
 @subgroup dominant {extern dots}
 @master {surface}
 @balllist {x} color=white radius= 0.02 master={surface} nohilite''' % (self.chain,
                                                 self.resseq,
-                                                self.altid)
+                                                self.altid,
+                                                self.radius_add)
     line = '{2fo-fc = %.4f} %s %.3f,%.3f,%.3f'
     for v,xyz in self.xyz_density_values :
       if   v < 0.8 : col = 'red'

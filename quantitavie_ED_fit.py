@@ -22,6 +22,8 @@ def get_args() :
                       type=float,help=hs)
   hs = 'specify an out file name for the kinemage.'
   parser.add_argument('-k','--kinemage_out',dest='kin_out',help=hs)
+  hs = 'create shells of surfaces around each residue'
+  parser.add_argument('-s','--shells',dest='shells',help=hs,action='store_true')
   args = parser.parse_args()
 
   assert os.path.exists(args.pdb_file)
@@ -52,6 +54,8 @@ def run(args) :
   base = os.path.basename(args.pdb_file)
   nohfn = base[:base.rfind('.')] + '_noH' + base[base.rfind('.'):]
   pdb_hierarchy.write_pdb_file(nohfn)
+  addlist = [args.add_distance]
+  if args.shells : addlist = [0,-0.25,-0.5,-0.75,-1.0,-1.25,-1.5]
 
   if args.kin_out : fle = open(args.kin_out,'w')
   write_head = True
@@ -62,19 +66,20 @@ def run(args) :
         for residue in conformer.residues():
           if args.res_num and residue.resseq_as_int() != args.res_num: continue
           # make the probe dot surface for the given residue
-          probe_dots = density_fit_utils.ProbeDots(
-                         nohfn,
-                         chain.id,
-                         residue.resseq_as_int(),
-                         radius_add = args.add_distance)
-          # calculate the map values at each dot
-          probe_dots.get_xyz_density_values(DM)
-          # write kin
-          if args.kin_out :
-            probe_dots.write_kin_dots_and_density_values(log=fle)
-          # write score csv to stdout
-          probe_dots.write_comprehencive_score(write_head=write_head)
-          if write_head : write_head = False
+          for add in addlist :
+            probe_dots = density_fit_utils.ProbeDots(
+                           nohfn,
+                           chain.id,
+                           residue.resseq_as_int(),
+                           radius_add = add)
+            # calculate the map values at each dot
+            probe_dots.get_xyz_density_values(DM)
+            # write kin
+            if args.kin_out :
+              probe_dots.write_kin_dots_and_density_values(log=fle)
+            # write score csv to stdout
+            probe_dots.write_comprehencive_score(write_head=write_head)
+            if write_head : write_head = False
 
   if args.kin_out : fle.close()
 
