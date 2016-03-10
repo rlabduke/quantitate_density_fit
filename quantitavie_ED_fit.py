@@ -40,7 +40,19 @@ def run(args) :
 # print DM.get_map_value(xyz)
 
 # probe
-  pdb_hierarchy = density_fit_utils.get_pdb_hierarchy(args.pdb_file)
+  pdbo = density_fit_utils.pdb_to_xrs(args.pdb_file)
+  pdb_hierarchy  = pdbo.pdb_hierarchy
+  xray_structure = pdbo.xray_structure
+  # eliminate hydrogens
+  sele = ~(xray_structure.hd_selection())
+  n_hd = sele.count(False)
+  if (n_hd > 0) :
+    pdb_hierarchy = pdb_hierarchy.select(sele)
+    xray_structure = xray_structure.select(sele)
+  base = os.path.basename(args.pdb_file)
+  nohfn = base[:base.rfind('.')] + '_noH' + base[base.rfind('.'):]
+  pdb_hierarchy.write_pdb_file(nohfn)
+
   if args.kin_out : fle = open(args.kin_out,'w')
   write_head = True
   for chain in pdb_hierarchy.chains():
@@ -51,7 +63,7 @@ def run(args) :
           if args.res_num and residue.resseq_as_int() != args.res_num: continue
           # make the probe dot surface for the given residue
           probe_dots = density_fit_utils.ProbeDots(
-                         args.pdb_file,
+                         nohfn,
                          chain.id,
                          residue.resseq_as_int(),
                          radius_add = args.add_distance)

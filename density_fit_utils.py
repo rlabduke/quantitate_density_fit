@@ -12,6 +12,7 @@ from cStringIO import StringIO
 from cctbx import maptbx
 from iotbx import mtz
 import subprocess
+import mmtbx.maps
 
 core_params_str = """\
 atom_radius = None
@@ -41,14 +42,15 @@ map_1
   .help = First map to use in map CC calculation
 {
  type = Fc
-   .type = str
-   .help = Electron density map type. Example xmFobs-yDFcalc (for \
-           maximum-likelihood weighted map) or xFobs-yFcalc (for simple \
-           unweighted map), x and y are any real numbers.
- fill_missing_reflections = False
-   .type = bool
- isotropize = False
-   .type = bool
+    .type = str
+    .help = Electron density map type. Example xmFobs-yDFcalc (for \
+            maximum-likelihood weighted map) or xFobs-yFcalc (for simple \
+            unweighted map), x and y are any real numbers.
+  fill_missing_reflections = False
+    .type = bool
+  isotropize = False
+    .type = bool
+  grid_resolution_factor = 1/4.
 }
 map_2
   .help = Second map to use in map CC calculation
@@ -62,6 +64,7 @@ map_2
    .type = bool
  isotropize = True
    .type = bool
+  grid_resolution_factor = 1/4.
 }
 pdb_file_name = None
   .type = str
@@ -121,7 +124,7 @@ def extract_data_and_flags(params, crystal_symmetry=None):
       log                    = StringIO())
   return data_and_flags
 
-def pdb_to_xrs(pdb_file_name, scattering_table):
+def pdb_to_xrs(pdb_file_name, scattering_table='n_gaussian'):
   pdb_inp = iotbx.pdb.input(file_name = pdb_file_name)
   xray_structure = pdb_inp.xray_structure_simple()
   pdb_hierarchy = pdb_inp.construct_hierarchy()
@@ -191,16 +194,16 @@ class DensityMap(object) :
 
   def set_map(self) :
     params = master_params().extract()
-    fmodel,pdb_hierarchy = get_fmodel_pdb_hierarchy(pdb_file   = self.pdb_file,
+    self.fmodel,self.pdb_hierarchy = get_fmodel_pdb_hierarchy(
+                                  pdb_file   = self.pdb_file,
                                   mtz_file   = self.reflection_file,
                                   params     = params)
-    self.unit_cell = fmodel.xray_structure.unit_cell()
-    if(params is None): params =master_params().extract()
-    e_map_obj = fmodel.electron_density_map()
+    self.unit_cell = self.fmodel.xray_structure.unit_cell()
+    e_map_obj = self.fmodel.electron_density_map()
     coeffs = e_map_obj.map_coefficients(
-      map_type     = params.map_2.type,
-      fill_missing = params.map_2.fill_missing_reflections,
-      isotropize   = params.map_2.isotropize)
+      map_type     = '2mFo-DFc',
+      fill_missing = True,
+      isotropize   = True)
     fft_map = coeffs.fft_map(resolution_factor = params.resolution_factor)
     fft_map.apply_sigma_scaling()
     self.map = fft_map.real_map_unpadded()
