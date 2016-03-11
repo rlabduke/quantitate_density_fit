@@ -288,17 +288,23 @@ class ProbeDots(object) :
     print >> log, '''@group {%s,%s,%s,%.2f} animate dominant
 @subgroup dominant {extern dots}
 @master {surface}
-@balllist {x} color=white radius= 0.02 master={surface} nohilite''' % (self.chain,
+@balllist {x} color=white radius= 0.02 master={surface} nohilite''' % (
+                                                self.chain,
                                                 self.resseq,
                                                 self.altid,
                                                 self.radius_scale)
     line = '{2fo-fc = %.4f} %s %.3f,%.3f,%.3f'
     for v,xyz in self.xyz_density_values :
-      if   v < 0.8 : col = 'red'
-      elif v < 0.9 : col = 'orange'
-      elif v < 1.0 : col = 'yellow'
-      elif v < 1.1 : col = 'green'
-      else         : col = 'blue'
+      if   v < 0.5 : col = 'red'
+      elif v < 0.6 : col = 'orange'
+      elif v < 0.7 : col = 'gold'
+      elif v < 0.8 : col = 'yellow'
+      elif v < 0.9 : col = 'lime'
+      elif v < 1.0 : col = 'green'
+      elif v < 1.1 : col = 'cyan'
+      elif v < 1.2 : col = 'sky'
+      elif v < 1.3 : col = 'blue'
+      else         : col = 'purple'
       print >> log, line % (v,col,xyz[0],xyz[1],xyz[2])
 
   def write_comprehencive_score(self,write_head=False,
