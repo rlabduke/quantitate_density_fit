@@ -187,7 +187,11 @@ def get_pdb_hierarchy(pdb_file) :
   return input_pdb.construct_hierarchy()
 
 class DensityMap(object) :
-  def __init__(self,pdb_file,reflection_file,log=sys.stdout) :
+  def __init__(self,pdb_file,reflection_file,
+               map_scale='sigma',map_type='2mFo-DFc',log=sys.stdout) :
+    assert map_scale in ['volume','sigma']
+    self.map_scale = map_scale
+    self.map_type = map_type
     self.pdb_file = pdb_file
     self.reflection_file = reflection_file
     self.set_map()
@@ -200,12 +204,19 @@ class DensityMap(object) :
                                   params     = params)
     self.unit_cell = self.fmodel.xray_structure.unit_cell()
     e_map_obj = self.fmodel.electron_density_map()
+    fill_missing = True
+    isotropize   = True
+    if self.map_type == 'Fc' :
+      fill_missing = False
+      isotropize   = False
     coeffs = e_map_obj.map_coefficients(
-      map_type     = '2mFo-DFc',
-      fill_missing = True,
-      isotropize   = True)
+      map_type     = self.map_type,
+      fill_missing = fill_missing,
+      isotropize   = isotropize)
     fft_map = coeffs.fft_map(resolution_factor = params.resolution_factor)
-    fft_map.apply_sigma_scaling()
+    if self.map_scale == 'sigma'    : fft_map.apply_sigma_scaling()
+    elif self.map_scale == 'volume' : fft_map.apply_volume_scaling()
+    else: raise RuntimeError
     self.map = fft_map.real_map_unpadded()
 
   def get_map_value(self,xyz) :
@@ -213,20 +224,22 @@ class DensityMap(object) :
       self.unit_cell.fractionalize(xyz))
 
 class ProbeDots(object) :
-  def __init__(self,file_name,chain,resseq,altid=None,radius_add=-0.75) :
-    self.file_name  = file_name
-    self.chain      = chain
-    self.resseq     = resseq
-    self.altid      = altid
-    self.radius_add = radius_add
-    self.xyzs       = []
+  def __init__(self,file_name,chain,resseq,altid=None,radius_scale=-0.75) :
+    self.file_name    = file_name
+    self.chain        = chain
+    self.resseq       = resseq
+    self.altid        = altid
+    self.radius_scale = radius_scale
+    self.xyzs         = []
     self.run_probe_and_deposit_xyzs()
 
   def run_probe_and_deposit_xyzs(self) :
     probesele = 'CHAIN_%s %i' % (self.chain,self.resseq)
-    args = ['phenix.probe','-q','-rad0.0','-add%.2f' % self.radius_add]
+    args = ['phenix.probe','-q','-rad0.0']
+    if self.radius_scale != 0 : args += ['-scale%.2f' % self.radius_scale]
     #args = ['phenix.probe','-q','-drop','-rad0.0']
     args+= ['-out', probesele, self.file_name]
+#   print >> sys.stderr, ' '.join(args)
     pop = subprocess.Popen(args,stdout=subprocess.PIPE)
     self.kinemage_str = pop.communicate()[0]
     assert self.kinemage_str.strip() != ''
@@ -254,28 +267,31 @@ class ProbeDots(object) :
     self.set_density_fit_score()
 
   def set_density_fit_score(self) :
+    addv = 0
     self.density_fit_score = 0
     self.dots_n = 0
     self.dots_lt1, self.dots_gte1 = 0,0
     for v,xyz in self.xyz_density_values :
+      addv += v
       self.dots_n += 1
       if  v < 1.0 :
         self.dots_lt1 += 1
         self.density_fit_score += v
       else : self.dots_gte1 += 1
+    self.average_density = addv/self.dots_n
 
   def write_kin_dots(self,log=sys.stdout) :
     print >> log, self.kinemage_str
 
   def write_kin_dots_and_density_values(self,log=sys.stdout) :
     col = 'gray'
-    print >> log, '''@group dominant {%s,%s,%s,%.2f}
+    print >> log, '''@group {%s,%s,%s,%.2f} animate dominant
 @subgroup dominant {extern dots}
 @master {surface}
 @balllist {x} color=white radius= 0.02 master={surface} nohilite''' % (self.chain,
                                                 self.resseq,
                                                 self.altid,
-                                                self.radius_add)
+                                                self.radius_scale)
     line = '{2fo-fc = %.4f} %s %.3f,%.3f,%.3f'
     for v,xyz in self.xyz_density_values :
       if   v < 0.8 : col = 'red'
@@ -285,9 +301,30 @@ class ProbeDots(object) :
       else         : col = 'blue'
       print >> log, line % (v,col,xyz[0],xyz[1],xyz[2])
 
-  def write_comprehencive_score(self,write_head=False,log=sys.stdout) :
-    head = "chain,resseq,altid,dots_n,dots_lt1,dots_gte1,score"
+  def write_comprehencive_score(self,write_head=False,
+                                format='csv',log=sys.stdout) :
+    assert format in ['csv','human']
+    head = "chain,resseq,altid,surf_scale,dots_n,dots_lt1,dots_gte1,score,"
+    head+= "avg_density"
     if write_head : print >> log, head
-    print >> log, '%s,%i,%s,%i,%i,%i,%.4f' % (self.chain,self.resseq,self.altid,
-                           self.dots_n, self.dots_lt1, 
-                           self.dots_gte1, self.density_fit_score)
+    llist = [self.chain,self.resseq,self.altid,self.radius_scale,self.dots_n]
+    llist+= [self.dots_lt1,self.dots_gte1,self.density_fit_score]
+    llist+= [self.average_density]
+    csvs = '%s,%i,%s,%.2f,%i,%i,%i,%.4f,%.4f' % tuple(llist)
+    if format == 'csv' :
+      if write_head : print >> log, head
+      print >> log, csvs
+    else :
+      heads = head.split(',')
+      l = csvs.split(',')
+      ls = []#e.ljust(10) for e in l]
+      headformat = []
+      assert len(l) == len(heads)
+      for i,e in enumerate(l) :
+        if heads[i] == 'score' : ljl = 14
+        elif len(heads[i]) < 10 : ljl = 10
+        else : ljl =len(heads[i])
+        ls.append(e.ljust(ljl))
+        headformat.append(heads[i].ljust(ljl))
+      if write_head : print >> log, ''.join(headformat)
+      print >> log, ''.join(ls)
