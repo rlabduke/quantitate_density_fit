@@ -234,7 +234,7 @@ class ProbeDots(object) :
     self.run_probe_and_deposit_xyzs()
 
   def run_probe_and_deposit_xyzs(self) :
-    probesele = 'CHAIN_%s %i' % (self.chain,self.resseq)
+    probesele = 'not water CHAIN_%s %i' % (self.chain,self.resseq)
     args = ['phenix.probe','-q','-rad0.0']
     if self.radius_scale != 0 : args += ['-scale%.2f' % self.radius_scale]
     #args = ['phenix.probe','-q','-drop','-rad0.0']
