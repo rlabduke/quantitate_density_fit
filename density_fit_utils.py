@@ -224,22 +224,29 @@ class DensityMap(object) :
       self.unit_cell.fractionalize(xyz))
 
 class ProbeDots(object) :
-  def __init__(self,file_name,chain,resseq,altid=None,radius_scale=-0.75) :
-    self.file_name    = file_name
-    self.chain        = chain
-    self.resseq       = resseq
-    self.altid        = altid
-    self.radius_scale = radius_scale
-    self.xyzs         = []
+  def __init__(self,
+               file_name,
+               chain,
+               resseq,
+               altid=None,
+               radius_scale=-0.75,
+               include_waters=False) :
+    self.file_name      = file_name
+    self.chain          = chain
+    self.resseq         = resseq
+    self.altid          = altid
+    self.radius_scale   = radius_scale
+    self.include_waters = include_waters
+    self.xyzs           = []
     self.run_probe_and_deposit_xyzs()
 
   def run_probe_and_deposit_xyzs(self) :
-    probesele = 'not water CHAIN_%s %i' % (self.chain,self.resseq)
-    args = ['phenix.probe','-q','-rad0.0']
-    if self.radius_scale != 0 : args += ['-scale%.2f' % self.radius_scale]
+    probesele = 'CHAIN_%s %i' % (self.chain,self.resseq)
+    args = ['phenix.probe','-q','-rad0.0','-scale%.2f' % self.radius_scale]
+    if not self.include_waters : args += ['-nowat']
     #args = ['phenix.probe','-q','-drop','-rad0.0']
     args+= ['-out', probesele, self.file_name]
-#   print >> sys.stderr, ' '.join(args)
+    print >> sys.stderr, ' '.join(args)
     pop = subprocess.Popen(args,stdout=subprocess.PIPE)
     self.kinemage_str = pop.communicate()[0]
     assert self.kinemage_str.strip() != ''
@@ -312,7 +319,6 @@ class ProbeDots(object) :
     assert format in ['csv','human']
     head = "chain,resseq,altid,surf_scale,dots_n,dots_lt1,dots_gte1,score,"
     head+= "avg_density"
-    if write_head : print >> log, head
     llist = [self.chain,self.resseq,self.altid,self.radius_scale,self.dots_n]
     llist+= [self.dots_lt1,self.dots_gte1,self.density_fit_score]
     llist+= [self.average_density]

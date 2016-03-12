@@ -33,6 +33,8 @@ def get_args() :
   parser.add_argument('-m','--map_type',dest='map_type',help=hs)
   hs = 'run only liniar correlation between 2fo-fc and fc surface shells'
   parser.add_argument('--correlation',help=hs,action='store_true')
+  hs = 'include waters'
+  parser.add_argument('-w','--include_waters',help=hs,action='store_true')
   args = parser.parse_args()
 
   assert os.path.exists(args.pdb_file)
@@ -60,8 +62,8 @@ def remov_hs_get_hierarchy(pdb_file) :
 def get_map(args,map_t=None) :
   base = os.path.basename(args.pdb_file)
   if not map_t : map_t = args.map_type
+  print >> sys.stderr, 'calculating %s map' % map_t
   picklefn = base[:base.rfind('.')] + '_%s.pickle' % map_t
-  print map_t,picklefn
   if os.path.exists(picklefn) :
     fle = open(picklefn,'r')
     DM = pickle.load(fle)
@@ -78,9 +80,7 @@ def get_map(args,map_t=None) :
 
 def run_correlation(args,log=sys.stderr) :
   from cctbx.array_family import flex
-  print >> log, 'calculating 2mFo-DFc map'
   DM_tfo_fc = get_map(args,map_t='2mFo-DFc')
-  print >> log, 'calculating Fc map'
   DM_fc = get_map(args,map_t='Fc')
 
   kinhead = '''@group {%s,%s,%s,%.2f} animate dominant
@@ -104,7 +104,8 @@ def run_correlation(args,log=sys.stderr) :
                          nohfn,
                          chain.id,
                          residue.resseq_as_int(),
-                         radius_scale = scale)
+                         radius_scale = scale,
+                         include_waters = args.include_waters)
             # calculate the map values at each dot
             tfo_fc_values = []
             fc_values = []
@@ -155,7 +156,7 @@ def run() :
 # probe
   pdb_hierarchy,nohfn = remov_hs_get_hierarchy(args.pdb_file)
   scalelist = [args.vdw_scale]
-  if args.shells : scalelist = [0,0.9,0.8,0.7,0.6,0.5,0.4,0.3,0.2,0.1]
+  if args.shells : scalelist = [1,0.9,0.8,0.7,0.6,0.5,0.4,0.3,0.2,0.1]
   if args.kin_out : fle = open(args.kin_out,'w')
   write_head = True
   for chain in pdb_hierarchy.chains():
@@ -170,7 +171,8 @@ def run() :
                            nohfn,
                            chain.id,
                            residue.resseq_as_int(),
-                           radius_scale = scale)
+                           radius_scale = scale,
+                           include_waters = args.include_waters)
             # calculate the map values at each dot
             probe_dots.get_xyz_density_values(DM)
             # write kin
