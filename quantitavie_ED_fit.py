@@ -90,7 +90,7 @@ def run_correlation(args,log=sys.stderr) :
   kinline = '{2fo-fc = %.4f fc = %.4f  delta = %.4f} %s %.3f,%.3f,%.3f'
 
   pdb_hierarchy,nohfn = remov_hs_get_hierarchy(args.pdb_file)
-  scalelist = [0,0.9,0.8,0.7,0.6,0.5,0.4,0.3,0.2,0.1]
+  scalelist = [1,0.9,0.8,0.7,0.6,0.5,0.4,0.3,0.2,0.1]
   if args.kin_out : fle = open(args.kin_out,'w')
   for chain in pdb_hierarchy.chains():
     if args.chain and chain.id != args.chain : continue

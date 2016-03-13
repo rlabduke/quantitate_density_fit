@@ -246,7 +246,7 @@ class ProbeDots(object) :
     if not self.include_waters : args += ['-nowat']
     #args = ['phenix.probe','-q','-drop','-rad0.0']
     args+= ['-out', probesele, self.file_name]
-    print >> sys.stderr, ' '.join(args)
+    #print >> sys.stderr, ' '.join(args)
     pop = subprocess.Popen(args,stdout=subprocess.PIPE)
     self.kinemage_str = pop.communicate()[0]
     assert self.kinemage_str.strip() != ''
