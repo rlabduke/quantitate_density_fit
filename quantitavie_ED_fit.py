@@ -146,6 +146,24 @@ def run() :
   if args.correlation :
     run_correlation(args)
     sys.exit()
+
+  rds = density_fit_utils.ResidueDensityShells(pdb_file = args.pdb_file,
+                                               mtz_file = args.map_coeff_file,
+                                               map_scale = args.map_scale,
+                                               chain = args.chain,
+                                               res_num = args.res_num,
+                                               analysis_type = 'correlation')
+  prefix = "%s_%s_%s" % (args.pdb_file[:4],args.chain,args.res_num)
+  fn = "%s_shells.kin" % prefix
+  fle = open(fn,'w')
+  rds.write_shells_kin(log=fle)
+  fle.close()
+  print >> sys.stderr,'%s written.' % fn
+# rds.write_shells_scores()
+# rds.write_plots(prefix=prefix,typ='all')
+# rds.write_plots(prefix=prefix,typ='sc')
+# rds.write_plots(prefix=prefix,typ='bb')
+  sys.exit()
   # Get the density map object
   DM = get_map(args)
 
@@ -179,7 +197,7 @@ def run() :
             if args.kin_out :
               probe_dots.write_kin_dots_and_density_values(log=fle)
             # write score csv to stdout
-            probe_dots.write_comprehencive_score(write_head=write_head,
+            probe_dots.write_comprehensive_score(write_head=write_head,
                                                  format='human')
             if write_head : write_head = False
 
