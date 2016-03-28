@@ -163,46 +163,13 @@ def run() :
 # rds.write_plots(prefix=prefix,typ='all')
 # rds.write_plots(prefix=prefix,typ='sc')
 # rds.write_plots(prefix=prefix,typ='bb')
-  sys.exit()
-  # Get the density map object
-  DM = get_map(args)
 
-  # Here is how to get a map value at a specified point.
-# xyz = (20.112,37.025,24.574)
-# print DM.get_map_value(xyz)
-
-# probe
-  pdb_hierarchy,nohfn = remov_hs_get_hierarchy(args.pdb_file)
-  scalelist = [args.vdw_scale]
-  if args.shells : scalelist = [1,0.9,0.8,0.7,0.6,0.5,0.4,0.3,0.2,0.1]
-  if args.kin_out : fle = open(args.kin_out,'w')
-  write_head = True
-  for chain in pdb_hierarchy.chains():
-    if args.chain and chain.id != args.chain : continue
-    for residue_group in chain.residue_groups():
-      for conformer in residue_group.conformers():
-        for residue in conformer.residues():
-          if args.res_num and residue.resseq_as_int() != args.res_num: continue
-          # make the probe dot surface for the given residue
-          for scale in scalelist :
-            probe_dots = density_fit_utils.ProbeDots(
-                           nohfn,
-                           chain.id,
-                           residue.resseq_as_int(),
-                           radius_scale = scale,
-                           include_waters = args.include_waters)
-            # calculate the map values at each dot
-            probe_dots.get_xyz_density_values(DM)
-            # write kin
-            if args.kin_out :
-              probe_dots.write_kin_dots_and_density_values(log=fle)
-            # write score csv to stdout
-            probe_dots.write_comprehensive_score(write_head=write_head,
-                                                 format='human')
-            if write_head : write_head = False
-
-  if args.kin_out : fle.close()
+  print rds.get_fit2score()
+  #fn = "%s_scores.csv" % prefix
+  #fle = open(fn,'w')
+  #rds.write_shells_scores(log=fle)
+  #fle.close()
+  #print >> sys.stderr,'%s written.' % fn
 
 if __name__ == '__main__' :
   run()
-

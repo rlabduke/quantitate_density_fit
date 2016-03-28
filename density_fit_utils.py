@@ -330,12 +330,24 @@ class ResidueDensityShells(object) :
     for scale,probe_dots in self.density_shells :
       probe_dots.write_kin_dots_and_density_values(log=log)
 
-  def write_shells_scores(self,log=sys.stdout) :
+  def write_shells_scores(self,format='csv',log=sys.stdout) :
     write_head = True
     for scale,probe_dots in self.density_shells :
       probe_dots.write_comprehensive_score(write_head=write_head,
-                                                 format='human')
+                                                 format=format,log=log)
       if write_head : write_head = False
+
+  def get_fit2score(self,upperscale=0.8,lowerscale=0.3,typ='all') :
+    assert typ in ['all','bb','sc']
+    if hasattr(self,'fit2score') : return self.fit2score
+    self.fit2score = [0,0]
+    for scale,probe_dots in self.density_shells :
+      if scale <= lowerscale :
+        self.fit2score[0] -= probe_dots.dots_lt1[typ]
+      if scale >= upperscale :
+        self.fit2score[1] += probe_dots.dots_gte1[typ]
+    self.fit2score =  tuple(self.fit2score)
+    return self.fit2score
 
   def write_plots(self,prefix,typ) :
     # typ can be bb, sc, or all
