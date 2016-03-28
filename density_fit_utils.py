@@ -125,6 +125,8 @@ class ProbeDots(object) :
     self.average_density = {}
     self.dots_lt1_ratio = {}
     self.dots_gte1_ratio = {}
+    self.sum_abs_lt1 = {}
+    self.sum_abs_gte1 = {}
     self.run_probe_and_deposit_xyzs()
 
   def run_probe_and_deposit_xyzs(self) :
@@ -174,6 +176,7 @@ class ProbeDots(object) :
     self.density_fit_score[typ] = 0
     self.dots_n[typ] = 0
     self.dots_lt1[typ], self.dots_gte1[typ] = 0,0
+    self.sum_abs_lt1[typ], self.sum_abs_gte1[typ] = 0,0
     for xyz,vl in self.xyz_density_values['2mFo-DFc'].items() :
       v,label = vl
       if typ == 'sc' and label.atom in self.bb_atoms : continue
@@ -183,7 +186,10 @@ class ProbeDots(object) :
       if  v < 1.0 :
         self.dots_lt1[typ] += 1
         self.density_fit_score[typ] += v
-      else : self.dots_gte1[typ] += 1
+        self.sum_abs_lt1[typ] -= abs(v)
+      else :
+        self.dots_gte1[typ] += 1
+        self.sum_abs_gte1[typ] += v
     self.average_density[typ] = addv/self.dots_n[typ]
     self.dots_lt1_ratio[typ] = (self.dots_lt1[typ]*1.0)/self.dots_n[typ]
     self.dots_gte1_ratio[typ] = (self.dots_gte1[typ]*1.0)/self.dots_n[typ]
@@ -343,9 +349,9 @@ class ResidueDensityShells(object) :
     self.fit2score = [0,0]
     for scale,probe_dots in self.density_shells :
       if scale <= lowerscale :
-        self.fit2score[0] -= probe_dots.dots_lt1[typ]
+        self.fit2score[0] += probe_dots.sum_abs_lt1[typ]
       if scale >= upperscale :
-        self.fit2score[1] += probe_dots.dots_gte1[typ]
+        self.fit2score[1] += probe_dots.sum_abs_gte1[typ]
     self.fit2score =  tuple(self.fit2score)
     return self.fit2score
 
