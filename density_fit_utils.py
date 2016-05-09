@@ -8,6 +8,11 @@ import matplotlib.pyplot as plt
 from cStringIO import StringIO
 import subprocess
 import pickle
+from elbow.formats.protein_sequence_setup import protein_sequence_to_three
+
+l = ["ACE","NME"]
+reslist = [e for e in protein_sequence_to_three.values() if e not in l]
+reslist.append('MSE')
 
 def get_data_labels(mtz_file) :
   mtz_object = mtz.object(file_name=mtz_file)
@@ -103,6 +108,7 @@ class ProbeDots(object) :
                file_name,
                chain,
                resseq,
+               resname,
                altloc=None,
                icode=None,
                radius_scale=-0.75,
@@ -110,6 +116,7 @@ class ProbeDots(object) :
     self.file_name      = file_name
     self.chain          = chain
     self.resseq         = resseq
+    self.resname         = resname
     self.altloc         = altloc
     self.icode          = icode
     self.radius_scale   = radius_scale
@@ -136,7 +143,7 @@ class ProbeDots(object) :
     if not self.include_waters : args += ['-nowat']
     #args = ['phenix.probe','-q','-drop','-rad0.0']
     args+= ['-drop','-out', probesele, self.file_name]
-    print >> sys.stderr, ' '.join(args)
+    #print >> sys.stderr, ' '.join(args)
     pop = subprocess.Popen(args,stdout=subprocess.PIPE)
     self.kinemage_str = pop.communicate()[0]
     assert self.kinemage_str.strip() != ''
@@ -167,8 +174,9 @@ class ProbeDots(object) :
       self.xyz_density_values[mt][xyz] = (v,label)
       #print v,xyz
     self.set_density_fit_score(typ='all')
-    self.set_density_fit_score(typ='sc')
-    self.set_density_fit_score(typ='bb')
+    if self.resname in reslist :
+      self.set_density_fit_score(typ='bb')
+      if self.resname != 'GLY' : self.set_density_fit_score(typ='sc')
 
   def set_density_fit_score(self,typ) :
     # typ can be bb, sc, or all
@@ -307,8 +315,13 @@ class ResidueDensityShells(object) :
     self.nohfn += self.basename[self.basename.rfind('.'):]
     self.pdb_hierarchy.write_pdb_file(self.nohfn)
 
+  def get_residue_key(self,chain,resseq,icode,altloc,resname) :
+    l = [chain,resseq,icode,altloc,resname]
+    s = '_'.join([e.strip() for e in l])
+    return s
+
   def set_density_shells(self) :
-    self.density_shells = []
+    self.density_shells = {}
     for chain in self.pdb_hierarchy.chains():
       if self.chain and chain.id != self.chain : continue
       for residue_group in chain.residue_groups():
@@ -318,11 +331,17 @@ class ResidueDensityShells(object) :
             if residue.resname == 'HOH' : include_waters = True
             else : include_waters = False
             # make the probe dot surface for the given residue
+            if residue.resname != 'ILE' : continue
+            print >> sys.stderr, 'Working on %s' % ' '.join([chain.id,
+                                                            residue.resseq,
+                                                            residue.icode,
+                                                            conformer.altloc])
             for scale in self.scalelist :
               probe_dots = ProbeDots(
                            self.nohfn,
                            chain.id,
                            residue.resseq_as_int(),
+                           residue.resname,
                            altloc=conformer.altloc,
                            icode=residue.icode,
                            radius_scale = scale,
@@ -330,39 +349,68 @@ class ResidueDensityShells(object) :
 	      probe_dots.get_xyz_density_values(self.DM_tfo_fc)
               if self.analysis_type != '2mFo-DFc' :
                 probe_dots.get_xyz_density_values(self.DM_fc)
-              self.density_shells.append((scale,probe_dots))
+              rk = self.get_residue_key(chain.id,
+                                        residue.resseq,
+                                        residue.icode,
+                                        conformer.altloc,
+                                        residue.resname)
+              if rk not in self.density_shells.keys() :
+                self.density_shells[rk] = []
+              self.density_shells[rk].append((scale,probe_dots))
 
-  def write_shells_kin(self,log=sys.stdout) :
-    for scale,probe_dots in self.density_shells :
-      probe_dots.write_kin_dots_and_density_values(log=log)
+  def write_shells_kin(self,write_to_file=False,log=sys.stdout) :
+    for rk in self.density_shells.keys() :
+      if write_to_file :
+        fn = self.basename[:self.basename.rfind('.')] + '_' + rk + '.kin'
+        log = open(fn,'w')
+      for scale,probe_dots in self.density_shells[rk] :
+        probe_dots.write_kin_dots_and_density_values(log=log)
+      if write_to_file : 
+        log.close()
+        print >> sys.stderr, "%s written." % fn
 
-  def write_shells_scores(self,format='csv',log=sys.stdout) :
+  def write_shells_scores(self,resd=None,format='csv',log=sys.stdout) :
     write_head = True
-    for scale,probe_dots in self.density_shells :
-      probe_dots.write_comprehensive_score(write_head=write_head,
-                                                 format=format,log=log)
-      if write_head : write_head = False
+    for rk in self.density_shells.keys() :
+      for scale,probe_dots in self.density_shells[rk] :
+        probe_dots.write_comprehensive_score(write_head=write_head,
+                                                   format=format,log=log)
+        if write_head : write_head = False
 
-  def get_fit2score(self,upperscale=0.8,lowerscale=0.3,typ='all') :
+  def write_fit2score(self,
+                      resd=None,
+                      upperscale=0.8,
+                      lowerscale=0.3,
+                      typ='all',
+                      log=sys.stderr) :
     assert typ in ['all','bb','sc']
-    if hasattr(self,'fit2score') : return self.fit2score
-    self.fit2score = [0,0]
-    for scale,probe_dots in self.density_shells :
-      if scale <= lowerscale :
-        self.fit2score[0] += probe_dots.sum_abs_lt1[typ]
-      if scale >= upperscale :
-        self.fit2score[1] += probe_dots.sum_abs_gte1[typ]
-    self.fit2score =  tuple(self.fit2score)
-    return self.fit2score
+    self.fit2score = {}
+    keys = self.density_shells.keys()
+    keys.sort()
+    for rk in keys :
+      self.fit2score[rk] = [0,0]
+      for scale,probe_dots in self.density_shells[rk] :
+        if scale <= lowerscale :
+          self.fit2score[rk][0] += probe_dots.sum_abs_lt1[typ]
+        if scale >= upperscale :
+          self.fit2score[rk][1] += probe_dots.sum_abs_gte1[typ]
+      l = [rk,'%.3f'%self.fit2score[rk][0],'%.3f'%self.fit2score[rk][1]]
+      print >> log, ' '.join([e.ljust(12) for e in l])
 
-  def write_plots(self,prefix,typ) :
+  def write_plots(self,prefix,typ,resd=None) :
+    if len(self.density_shells) == 1 : rk = self.density_shells.keys()[0]
+    else :
+      assert resd, 'must provide resd'
+      for e in ['chain','resseq','icode','altloc','resname'] :
+        assert e in resd.keys()
+      rk = self.get_residue_key(**resd)
     # typ can be bb, sc, or all
     val_dict = {'radius_scale':[],'dots_n':[],'dots_lt1':[],'dots_gte1':[]}
     val_dict['dots_lt1_ratio'] = []
     val_dict['dots_gte1_ratio'] = []
     val_dict['density_fit_score'] = []
     val_dict['average_density'] = []
-    for scale,probe_dots in self.density_shells :
+    for scale,probe_dots in self.density_shells[rk] :
       val_dict['radius_scale'].append(probe_dots.radius_scale)
       val_dict['dots_n'].append(probe_dots.dots_n[typ])
       val_dict['dots_lt1'].append(probe_dots.dots_lt1[typ])

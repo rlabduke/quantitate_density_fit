@@ -154,17 +154,15 @@ def run() :
                                                res_num = args.res_num,
                                                analysis_type = 'correlation')
   prefix = "%s_%s_%s" % (args.pdb_file[:4],args.chain,args.res_num)
-  fn = "%s_shells.kin" % prefix
-  fle = open(fn,'w')
-  rds.write_shells_kin(log=fle)
-  fle.close()
-  print >> sys.stderr,'%s written.' % fn
+
+# rds.write_shells_kin(write_to_file=True)
+
 # rds.write_shells_scores()
 # rds.write_plots(prefix=prefix,typ='all')
 # rds.write_plots(prefix=prefix,typ='sc')
 # rds.write_plots(prefix=prefix,typ='bb')
 
-  print rds.get_fit2score()
+  rds.write_fit2score()
   #fn = "%s_scores.csv" % prefix
   #fle = open(fn,'w')
   #rds.write_shells_scores(log=fle)
